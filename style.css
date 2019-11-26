@@ -1,0 +1,132 @@
+body {
+    overflow: hidden;
+}
+
+.row {
+    display: table-row;
+    height: 50px;
+}
+
+.col {
+    display: table-cell;
+    width: 50px;
+    height: 50px;
+    line-height: 50px;
+    text-align: center;
+    margin: 2px;
+    padding: 3px;
+    border: solid 1px #000;
+}
+
+/* @see: https://stackoverflow.com/a/4407335/4927212 */
+.noselect {
+    -webkit-touch-callout: none;    /* iOS Safari */
+    -webkit-user-select: none;      /* Safari */
+    -khtml-user-select: none;       /* Konqueror HTML */
+    -moz-user-select: none;         /* Old versions of Firefox */
+    -ms-user-select: none;          /* Internet Explorer/Edge */
+    user-select: none;              /* Non-prefixed version, currently
+                                    supported by Chrome, Opera and Firefox */
+}
+
+.container {
+    margin: 0 auto;
+    display: table;
+}
+
+main {
+    margin: 0 auto;
+    text-align: center;
+}
+
+.title {
+    font-family: 'Times New Roman', Times, serif;
+    font-style: italic;
+    font-size: 3em;
+}
+
+#start {
+    margin: 10px auto;
+    height: 40px;
+}
+
+.col {
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 1.5em;
+}
+
+.col.failure {
+    background-color: #f00;
+    color: #fff;
+}
+
+.col.success {
+    background-color: rgb(37, 165, 37);
+    color: #fff;
+}
+
+.col.hide {
+    background-color: rgba(255, 255, 255, 0);
+    color: #fff;
+}
+
+.config {
+    margin: 15px;
+}
+.config * {
+    display: inline;
+}
+.config>* {
+    margin: 0 5px;
+}
+.config input {
+    width: 20px;
+}
+
+.instruction {
+    padding: 0 20px;
+    width: 90vw;
+    text-align: center;
+    margin: 0 auto;
+}
+.instruction p {
+    text-align: left;
+}
+.instruction p:before {
+    content: "* ";
+}
+
+/*
+#message {
+    position: absolute;
+    top: 140px;
+    left: 0;
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 585px;
+    line-height: 480px;
+    font-size: 4em;
+    color: rgba(255, 255, 255, 1);
+    background-color: rgba(0, 0, 0, 0.8);
+}
+*/
+
+footer {
+    position: relative;
+    left: 0;
+    bottom: 0;
+    margin: 0 auto;
+    width: 90vw;
+    height: 30px;
+    font-size: 10px;
+    text-align: center;
+    padding: 1px;
+    color: rgb(255, 255, 255);
+    background: rgb(32, 32, 32);
+}
+
+.hidden {
+    display: none;
+}
