@@ -1,0 +1,28 @@
+{
+  "name": "human-memory-test",
+  "version": "1.0.0",
+  "description": "Human Memory Test Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --mac --linux"
+  },
+  "author": "KaiserKatze",
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.kaiserkatze.humanmemorytest",
+    "productName": "Human Memory Test",
+    "mac": {
+      "category": "public.app-category.games"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

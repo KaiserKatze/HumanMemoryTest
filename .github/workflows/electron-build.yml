@@ -1,0 +1,35 @@
+name: Build and Release Electron App
+
+on:
+  push:
+    tags:
+      - 'v*' # 仅在推送类似 v1.0.0 的 tag 时触发打包发布
+
+permissions:
+  contents: write # 允许工作流创建 Release
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # 同时在 Windows, Ubuntu 和 macOS 上运行打包
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build and Publish Electron app
+        run: npx electron-builder --publish always
+        env:
+          # 使用 GitHub 自动提供的 Token 来发布 Release
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
