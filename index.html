@@ -1,58 +1,1015 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="description" content="A Game of Memory">
-        <meta name="keywords" content="Game">
-        <meta name="author" content="KaiserKatze">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Memory</title>
-        <script src="./actuator.js" type="text/javascript"></script>
-        <link rel="stylesheet" type="text/css" href="./style.css">
-    </head>
-    <body>
-        <main>
-            <h1 class="title noselect">Memory</h1>
-            <div class="config">
-                <div>
-                    <label for="row" class="lang-en" lang="en">Row:</label>
-                    <input type="text" id="row" name="row" value="5" />
-                    <label for="row" class="lang-zh hidden" lang="zh">行</label>
-                </div>
-                <div>
-                    <label for="col" class="lang-en" lang="en">Column:</label>
-                    <input type="text" id="col" name="col" value="5" />
-                    <label for="col" class="lang-zh hidden" lang="zh">列</label>
-                </div>
-            </div>
-            <div class="container noselect"></div>
-            <button id="start">Start</button>
-            <div id="message">
-                <!--<p>You failed. Please restart!</p>-->
-            </div>
-            <div>
-                <div class="instruction lang-en" lang="en">
-                    <h2>How to play:</h2>
-                    <p>Click "Start" button;</p>
-                    <p>Remember all the numbers in the grids;</p>
-                    <p>Click the numbers in ascending order.</p>
-                </div>
-                <div class="instruction lang-zh hidden" lang="zh">
-                    <h2>怎么玩：</h2>
-                    <p>点击“Start”按钮开始；</p>
-                    <p>记住格子中的所有数字；</p>
-                    <p>按从小到大的顺序点击被隐藏的数字。</p>
-                </div>
-            </div>
-        </main>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="A Game of Memory">
+    <meta name="keywords" content="Game, Memory">
+    <meta name="author" content="KaiserKatze">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory — 记忆挑战</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        /* ── fonts ── */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@1,700&display=swap');
 
-        <script type="text/javascript">
-            resetRule();
-            detectLanguage();
-        </script>
+        :root {
+            --clr-bg:        #0f1117;
+            --clr-surface:   #1a1d27;
+            --clr-card:      #22263a;
+            --clr-border:    #2e3350;
+            --clr-accent:    #6c63ff;
+            --clr-accent2:   #a78bfa;
+            --clr-success:   #22c55e;
+            --clr-failure:   #ef4444;
+            --clr-text:      #e2e8f0;
+            --clr-muted:     #8892a4;
+            --cell-size:     64px;
+            --cell-gap:      6px;
+        }
 
-        <footer>
-            <p>Copyright &#169; 2019 KaiserKatze.</p>
-        </footer>
-    </body>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--clr-bg);
+            color: var(--clr-text);
+            overflow-x: hidden;
+        }
+
+        /* ── animated bg ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 20% -10%, rgba(108,99,255,.18) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 80% 110%, rgba(167,139,250,.12) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body > * { position: relative; z-index: 1; }
+
+        /* ── noselect ── */
+        .noselect {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* ── grid cell ── */
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            border: 2px solid var(--clr-border);
+            background: var(--clr-card);
+            font-size: clamp(1rem, 2vw, 1.4rem);
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform .12s ease, box-shadow .12s ease, background .15s ease, border-color .15s ease, color .15s ease;
+            color: var(--clr-text);
+            position: relative;
+            overflow: hidden;
+        }
+        .cell::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0);
+            transition: background .1s;
+            border-radius: inherit;
+        }
+        .cell:hover:not(.success):not(.failure) {
+            transform: scale(1.07);
+            border-color: var(--clr-accent2);
+            box-shadow: 0 0 14px rgba(108,99,255,.45);
+        }
+        .cell:active:not(.success):not(.failure) {
+            transform: scale(.95);
+        }
+        .cell.hide {
+            background: var(--clr-surface);
+            border-color: var(--clr-border);
+            color: transparent;
+        }
+        .cell.hide:hover {
+            border-color: var(--clr-accent2);
+            box-shadow: 0 0 14px rgba(108,99,255,.45);
+        }
+        .cell.success {
+            background: linear-gradient(135deg, #16a34a, #22c55e);
+            border-color: #4ade80;
+            color: #fff;
+            box-shadow: 0 0 16px rgba(34,197,94,.5);
+            cursor: default;
+            animation: popIn .2s ease;
+        }
+        .cell.failure {
+            background: linear-gradient(135deg, #b91c1c, #ef4444);
+            border-color: #f87171;
+            color: #fff;
+            box-shadow: 0 0 16px rgba(239,68,68,.5);
+            cursor: default;
+            animation: shake .35s ease;
+        }
+
+        @keyframes popIn {
+            0%   { transform: scale(.8); }
+            60%  { transform: scale(1.12); }
+            100% { transform: scale(1); }
+        }
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20%      { transform: translateX(-6px); }
+            40%      { transform: translateX(6px); }
+            60%      { transform: translateX(-4px); }
+            80%      { transform: translateX(4px); }
+        }
+
+        /* ── game grid ── */
+        #game-grid {
+            display: grid;
+            gap: var(--cell-gap);
+        }
+
+        /* ── button ── */
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 36px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: .03em;
+            border: none;
+            cursor: pointer;
+            transition: transform .12s, box-shadow .12s, opacity .12s;
+            background: linear-gradient(135deg, var(--clr-accent), #a78bfa);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(108,99,255,.4);
+        }
+        .btn-primary:hover  { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(108,99,255,.55); }
+        .btn-primary:active { transform: translateY(0);    box-shadow: 0 2px 10px rgba(108,99,255,.3); }
+
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 28px;
+            border-radius: 10px;
+            font-size: .9rem;
+            font-weight: 600;
+            border: 2px solid var(--clr-border);
+            cursor: pointer;
+            transition: transform .12s, box-shadow .12s, border-color .15s;
+            background: var(--clr-card);
+            color: var(--clr-muted);
+        }
+        .btn-secondary:hover {
+            border-color: var(--clr-accent2);
+            color: var(--clr-accent2);
+            transform: translateY(-1px);
+        }
+
+        /* ── toggle switch ── */
+        .toggle-track {
+            width: 48px;
+            height: 26px;
+            border-radius: 999px;
+            background: var(--clr-border);
+            position: relative;
+            cursor: pointer;
+            transition: background .2s;
+        }
+        .toggle-track.on { background: var(--clr-accent); }
+        .toggle-thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            transition: transform .2s;
+            box-shadow: 0 1px 4px rgba(0,0,0,.4);
+        }
+        .toggle-track.on .toggle-thumb { transform: translateX(22px); }
+
+        /* ── countdown ring ── */
+        #countdown-ring { transform: rotate(-90deg); }
+        #countdown-ring circle.track { stroke: var(--clr-border); fill: none; }
+        #countdown-ring circle.progress {
+            fill: none;
+            stroke: var(--clr-accent);
+            stroke-linecap: round;
+            transition: stroke-dashoffset .05s linear, stroke .3s;
+        }
+
+        /* ── toast ── */
+        #toast {
+            position: fixed;
+            top: 28px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-120px);
+            z-index: 999;
+            padding: 14px 28px;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: .95rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,.4);
+            transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+        #toast.record { background: linear-gradient(135deg, #7c3aed, #6c63ff); color: #fff; }
+        #toast.info   { background: linear-gradient(135deg, #0e7490, #06b6d4); color: #fff; }
+        #toast.fail   { background: linear-gradient(135deg, #b91c1c, #ef4444); color: #fff; }
+        #toast.win    { background: linear-gradient(135deg, #15803d, #22c55e); color: #fff; }
+
+        /* ── scoreboard ── */
+        .score-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: var(--clr-card);
+            border: 1px solid var(--clr-border);
+            font-size: .82rem;
+            color: var(--clr-muted);
+        }
+        .score-pill strong { color: var(--clr-accent2); font-size: .95rem; }
+
+        /* ── input ── */
+        .input-num {
+            width: 64px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 2px solid var(--clr-border);
+            background: var(--clr-surface);
+            color: var(--clr-text);
+            font-size: 1rem;
+            font-weight: 600;
+            text-align: center;
+            outline: none;
+            transition: border-color .15s;
+            -moz-appearance: textfield;
+        }
+        .input-num::-webkit-inner-spin-button,
+        .input-num::-webkit-outer-spin-button { -webkit-appearance: none; }
+        .input-num:focus { border-color: var(--clr-accent); }
+
+        /* ── section card ── */
+        .glass-card {
+            background: rgba(26,29,39,.7);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--clr-border);
+            border-radius: 20px;
+        }
+
+        /* ── message overlay on grid ── */
+        #msg-overlay {
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity .3s;
+            background: rgba(15,17,23,.75);
+            backdrop-filter: blur(4px);
+        }
+        #msg-overlay.show { opacity: 1; }
+
+        /* ── instructions ── */
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .step-num {
+            min-width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--clr-accent), var(--clr-accent2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .78rem;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        /* ── progress bar for countdown ── */
+        #progress-bar-wrap {
+            width: 100%;
+            height: 6px;
+            border-radius: 999px;
+            background: var(--clr-border);
+            overflow: hidden;
+        }
+        #progress-bar {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--clr-accent), var(--clr-accent2));
+            transition: width .05s linear, background .3s;
+        }
+
+        /* ── confetti ── */
+        .confetti-piece {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 9999;
+            animation: confettiFall linear forwards;
+        }
+        @keyframes confettiFall {
+            0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* ── hidden ── */
+        .hidden { display: none !important; }
+
+        /* ── memorize phase pulse ── */
+        #grid-wrapper.memorizing {
+            animation: borderPulse 1s ease-in-out infinite;
+        }
+        @keyframes borderPulse {
+            0%, 100% { border-color: var(--clr-border); box-shadow: none; }
+            50%       { border-color: var(--clr-accent2); box-shadow: 0 0 18px rgba(108,99,255,.35); }
+        }
+
+        /* ── playing phase indicator ── */
+        #grid-wrapper.playing {
+            border-color: rgba(34,197,94,.4);
+        }
+
+        /* ── responsive cell sizing ── */
+        @media (max-width: 480px) {
+            :root { --cell-size: 52px; --cell-gap: 4px; }
+        }
+        @media (max-width: 360px) {
+            :root { --cell-size: 44px; --cell-gap: 3px; }
+        }
+    </style>
+</head>
+<body class="noselect">
+
+<!-- ── Toast ── -->
+<div id="toast">
+    <span id="toast-icon">🏆</span>
+    <span id="toast-text"></span>
+</div>
+
+<!-- ── Main Layout ── -->
+<div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; padding: 32px 16px 80px;">
+
+    <!-- Title -->
+    <div style="text-align:center; margin-bottom: 32px;">
+        <h1 style="font-family:'Playfair Display',serif; font-style:italic; font-size:clamp(2.4rem,6vw,3.8rem); font-weight:700;
+                   background: linear-gradient(135deg, #a78bfa, #6c63ff, #60a5fa);
+                   -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+                   line-height:1.1; margin-bottom:8px;">
+            Memory
+        </h1>
+        <p style="color:var(--clr-muted); font-size:.9rem; letter-spacing:.08em; text-transform:uppercase;">记忆挑战</p>
+    </div>
+
+    <!-- Main Card -->
+    <div class="glass-card" style="width:100%; max-width:680px; padding: 28px 24px;">
+
+        <!-- Config Row -->
+        <div style="display:flex; flex-wrap:wrap; gap:20px; align-items:center; justify-content:space-between; margin-bottom:24px;">
+
+            <!-- Grid Size -->
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span style="color:var(--clr-muted); font-size:.85rem; font-weight:500;">矩阵大小</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button onclick="adjustSize(-1)" class="btn-secondary" style="padding:6px 12px; font-size:1rem;">−</button>
+                    <input type="number" id="size-input" class="input-num" value="3" min="2" max="10" readonly>
+                    <button onclick="adjustSize(1)"  class="btn-secondary" style="padding:6px 12px; font-size:1rem;">+</button>
+                </div>
+                <span style="color:var(--clr-muted); font-size:.85rem;" id="size-label">3 × 3</span>
+            </div>
+
+            <!-- Hide Numbers Toggle -->
+            <div style="display:flex; align-items:center; gap:10px;" id="hide-toggle-wrap">
+                <span style="color:var(--clr-muted); font-size:.85rem; font-weight:500;">隐藏数字</span>
+                <div class="toggle-track on" id="hide-toggle" onclick="toggleHide()">
+                    <div class="toggle-thumb"></div>
+                </div>
+                <span style="font-size:.8rem; color:var(--clr-accent2);" id="hide-label">开启</span>
+            </div>
+        </div>
+
+        <!-- Countdown Config -->
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;" id="countdown-config">
+            <span style="color:var(--clr-muted); font-size:.85rem; font-weight:500;">记忆时间</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button onclick="adjustCountdown(-1)" class="btn-secondary" style="padding:6px 12px; font-size:1rem;">−</button>
+                <input type="number" id="countdown-input" class="input-num" value="5" min="1" max="30" readonly style="width:52px;">
+                <button onclick="adjustCountdown(1)"  class="btn-secondary" style="padding:6px 12px; font-size:1rem;">+</button>
+            </div>
+            <span style="color:var(--clr-muted); font-size:.85rem;">秒</span>
+        </div>
+
+        <!-- Scores Row -->
+        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px;" id="scores-row">
+            <div class="score-pill" id="pill-best">
+                🏆 最佳用时 <strong id="best-time-val">—</strong>
+            </div>
+            <div class="score-pill" id="pill-mode">
+                <span id="pill-mode-label">👁 可见模式</span>
+            </div>
+            <div class="score-pill">
+                🎯 <span id="pill-size-label">5×5</span>
+            </div>
+        </div>
+
+        <!-- Countdown Progress (shown during memorize phase) -->
+        <div id="countdown-ui" class="hidden" style="margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-size:.85rem; color:var(--clr-muted);">记忆倒计时</span>
+                <span id="countdown-text" style="font-size:1.1rem; font-weight:700; color:var(--clr-accent2);">5s</span>
+            </div>
+            <div id="progress-bar-wrap"><div id="progress-bar" style="width:100%;"></div></div>
+        </div>
+
+        <!-- Game Grid Wrapper -->
+        <div style="display:flex; justify-content:center; margin-bottom:24px;">
+            <div id="grid-wrapper" style="position:relative; display:inline-block; border-radius:16px; padding:10px; background:rgba(34,38,58,.5); border:1px solid var(--clr-border);">
+                <div id="game-grid"></div>
+                <div id="msg-overlay">
+                    <span id="msg-overlay-icon" style="font-size:2.5rem;"></span>
+                    <span id="msg-overlay-text" style="color:var(--clr-text);"></span>
+                    <span id="msg-overlay-sub" style="font-size:.9rem; color:var(--clr-muted);"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timer row (shown during play phase) -->
+        <div id="timer-row" class="hidden" style="text-align:center; margin-bottom:16px;">
+            <span style="color:var(--clr-muted); font-size:.85rem;">用时</span>
+            <span id="timer-display" style="font-size:1.4rem; font-weight:700; color:var(--clr-accent2); margin-left:8px;">0.0s</span>
+        </div>
+
+        <!-- Action Button -->
+        <div style="display:flex; justify-content:center; gap:12px;">
+            <button id="main-btn" class="btn-primary" onclick="handleMainButton()">
+                <span id="main-btn-icon">▶</span>
+                <span id="main-btn-text">开始游戏</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Instructions Card -->
+    <div class="glass-card" style="width:100%; max-width:680px; padding:24px; margin-top:20px;">
+        <h2 style="font-size:1rem; font-weight:600; margin-bottom:16px; color:var(--clr-accent2); letter-spacing:.04em;">
+            📖 游戏说明
+        </h2>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <div class="step">
+                <div class="step-num">1</div>
+                <div style="color:var(--clr-muted); font-size:.9rem; line-height:1.6;">
+                    设置矩阵大小（N×N），选择是否隐藏数字，设定记忆时间后点击 <strong style="color:var(--clr-text);">开始游戏</strong>。
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <div style="color:var(--clr-muted); font-size:.9rem; line-height:1.6;">
+                    <strong style="color:var(--clr-text);">隐藏模式</strong>：倒计时结束后数字被隐藏，凭记忆按从小到大顺序点击。<br>
+                    <strong style="color:var(--clr-text);">可见模式</strong>：数字始终可见，直接按顺序点击即可。
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <div style="color:var(--clr-muted); font-size:.9rem; line-height:1.6;">
+                    全部点对即获胜！成绩按「模式 × 矩阵大小」分别记录，突破记录会有特别提示 🎉
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Card -->
+    <div class="glass-card" style="width:100%; max-width:680px; padding:24px; margin-top:20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <h2 style="font-size:1rem; font-weight:600; color:var(--clr-accent2); letter-spacing:.04em;">📊 历史记录</h2>
+            <button onclick="clearAllScores()" class="btn-secondary" style="padding:6px 16px; font-size:.8rem;">清除</button>
+        </div>
+        <div id="history-table" style="font-size:.85rem; color:var(--clr-muted);">暂无记录</div>
+    </div>
+</div>
+
+<footer style="position:fixed; bottom:0; left:0; width:100%; padding:8px; text-align:center;
+               font-size:.72rem; color:var(--clr-muted); background:var(--clr-bg);
+               border-top:1px solid var(--clr-border); z-index:10;">
+    © 2019 – 2025 KaiserKatze · Memory Game
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════ */
+function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+/* ── Cookie helpers ── */
+function setCookie(name, value, days = 365) {
+    const d = new Date();
+    d.setTime(d.getTime() + days * 86400000);
+    document.cookie = `${name}=${encodeURIComponent(value)};expires=${d.toUTCString()};path=/;SameSite=Lax`;
+}
+function getCookie(name) {
+    const prefix = name + '=';
+    for (const part of document.cookie.split(';')) {
+        const c = part.trim();
+        if (c.startsWith(prefix)) return decodeURIComponent(c.slice(prefix.length));
+    }
+    return null;
+}
+
+/* ── Score storage ── */
+// Key format: mem_score__{mode}__{size}
+// mode: "hide" | "show"
+// size: e.g. "5"
+function scoreKey(mode, size) {
+    return `mem_score__${mode}__${size}`;
+}
+function getBestScore(mode, size) {
+    const v = getCookie(scoreKey(mode, size));
+    return v ? parseFloat(v) : null;
+}
+function setBestScore(mode, size, value) {
+    setCookie(scoreKey(mode, size), value.toFixed(3));
+}
+
+/* ── All scores (for history table) ── */
+function getAllScores() {
+    const result = [];
+    for (const cookie of document.cookie.split(';')) {
+        const [rawKey, rawVal] = cookie.trim().split('=');
+        if (!rawKey || !rawKey.startsWith('mem_score__')) continue;
+        const parts = rawKey.split('__');
+        if (parts.length !== 3) continue;
+        const [, mode, size] = parts;
+        result.push({ mode, size: parseInt(size), time: parseFloat(decodeURIComponent(rawVal)) });
+    }
+    result.sort((a, b) => a.size - b.size || a.mode.localeCompare(b.mode));
+    return result;
+}
+function clearAllScores() {
+    const keysToDelete = [];
+    for (const cookie of document.cookie.split(';')) {
+        const rawKey = cookie.trim().split('=')[0];
+        if (rawKey && rawKey.startsWith('mem_score__')) keysToDelete.push(rawKey);
+    }
+    for (const k of keysToDelete) {
+        document.cookie = `${k}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/`;
+    }
+    renderHistory();
+    updateScorePills();
+    showToast('info', '🗑️', '历史记录已清除');
+}
+
+/* ── Toast ── */
+let toastTimer = null;
+function showToast(type, icon, text, duration = 3000) {
+    const el = document.getElementById('toast');
+    el.className = `show ${type}`;
+    document.getElementById('toast-icon').textContent = icon;
+    document.getElementById('toast-text').textContent = text;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = type; }, duration);
+}
+
+/* ── Confetti ── */
+function launchConfetti(count = 60) {
+    const colors = ['#6c63ff','#a78bfa','#22c55e','#60a5fa','#f472b6','#fbbf24'];
+    for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'confetti-piece';
+        el.style.cssText = `
+            left: ${Math.random() * 100}vw;
+            top: -10px;
+            background: ${colors[Math.floor(Math.random() * colors.length)]};
+            width: ${6 + Math.random() * 8}px;
+            height: ${6 + Math.random() * 8}px;
+            border-radius: ${Math.random() > .5 ? '50%' : '2px'};
+            animation-duration: ${1.5 + Math.random() * 2}s;
+            animation-delay: ${Math.random() * .8}s;
+        `;
+        document.body.appendChild(el);
+        el.addEventListener('animationend', () => el.remove());
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════ */
+let N = 3;                  // grid size (N×N)
+let countdownSecs = 5;      // memorize time
+let hideMode = true;        // true = hide numbers after countdown
+
+// Phase: 'idle' | 'memorize' | 'playing' | 'end'
+let phase = 'idle';
+let everStarted = false;    // once true, button shows "重置"
+
+let arr = [];               // shuffled numbers 1..N²
+let clicked = [];           // bool array N²
+let clickCounter = 0;
+
+let countdownInterval = null;
+let countdownRemaining = 0;
+
+let timerInterval = null;
+let timerStart = 0;
+let timerElapsed = 0;       // ms
+
+/* ═══════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', () => {
+    buildGrid();
+    updateScorePills();
+    renderHistory();
+});
+
+/* ═══════════════════════════════════════════════════════
+   CONFIG CONTROLS
+═══════════════════════════════════════════════════════ */
+function adjustSize(delta) {
+    if (phase !== 'idle') return;
+    N = Math.min(10, Math.max(2, N + delta));
+    document.getElementById('size-input').value = N;
+    document.getElementById('size-label').textContent = `${N} × ${N}`;
+    buildGrid();
+    updateScorePills();
+    renderHistory();
+}
+
+function adjustCountdown(delta) {
+    if (phase !== 'idle') return;
+    countdownSecs = Math.min(30, Math.max(1, countdownSecs + delta));
+    document.getElementById('countdown-input').value = countdownSecs;
+}
+
+function toggleHide() {
+    if (phase !== 'idle') return;
+    hideMode = !hideMode;
+    const track = document.getElementById('hide-toggle');
+    const label = document.getElementById('hide-label');
+    const countdownConfig = document.getElementById('countdown-config');
+    if (hideMode) {
+        track.classList.add('on');
+        label.textContent = '开启';
+        countdownConfig.classList.remove('hidden');
+    } else {
+        track.classList.remove('on');
+        label.textContent = '关闭';
+        countdownConfig.classList.add('hidden');
+    }
+    document.getElementById('pill-mode-label').textContent = hideMode ? '🙈 隐藏模式' : '👁 可见模式';
+    updateScorePills();
+}
+
+/* ═══════════════════════════════════════════════════════
+   GRID BUILDING
+═══════════════════════════════════════════════════════ */
+function buildGrid() {
+    const size = N * N;
+    arr = Array.from({ length: size }, (_, i) => i + 1);
+    clicked = new Array(size).fill(false);
+
+    const grid = document.getElementById('game-grid');
+    grid.style.gridTemplateColumns = `repeat(${N}, var(--cell-size))`;
+    grid.innerHTML = '';
+
+    for (let i = 0; i < size; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.index = i;
+        cell.dataset.value = arr[i];
+        cell.textContent = arr[i];
+        cell.addEventListener('click', onCellClick);
+        grid.appendChild(cell);
+    }
+
+    hideOverlay();
+}
+
+function getCells() {
+    return Array.from(document.getElementById('game-grid').children);
+}
+
+/* ═══════════════════════════════════════════════════════
+   MAIN BUTTON
+═══════════════════════════════════════════════════════ */
+function handleMainButton() {
+    if (!everStarted) {
+        // Very first click → start
+        everStarted = true;
+        setButtonReset();
+        startMemorizePhase();
+    } else {
+        // Any subsequent click → reset
+        resetToIdle();
+        startMemorizePhase();
+    }
+}
+
+function setButtonStart() {
+    document.getElementById('main-btn-icon').textContent = '▶';
+    document.getElementById('main-btn-text').textContent = '开始游戏';
+}
+function setButtonReset() {
+    document.getElementById('main-btn-icon').textContent = '↺';
+    document.getElementById('main-btn-text').textContent = '重置';
+}
+
+/* ═══════════════════════════════════════════════════════
+   GAME PHASES
+═══════════════════════════════════════════════════════ */
+function startMemorizePhase() {
+    phase = 'memorize';
+    clickCounter = 0;
+    const size = N * N;
+
+    // Shuffle
+    shuffle(arr);
+    clicked = new Array(size).fill(false);
+
+    // Render shuffled grid (numbers visible)
+    const cells = getCells();
+    cells.forEach((cell, i) => {
+        cell.className = 'cell';
+        cell.dataset.value = arr[i];
+        cell.textContent = arr[i];
+    });
+
+    // Lock config
+    lockConfig(true);
+    hideOverlay();
+
+    // Visual indicator on grid wrapper
+    const wrapper = document.getElementById('grid-wrapper');
+    wrapper.className = '';
+    if (hideMode) wrapper.classList.add('memorizing');
+
+    if (hideMode) {
+        // Show countdown UI
+        document.getElementById('countdown-ui').classList.remove('hidden');
+        document.getElementById('timer-row').classList.add('hidden');
+        countdownRemaining = countdownSecs;
+        updateCountdownUI(countdownRemaining, countdownSecs);
+
+        countdownInterval = setInterval(() => {
+            countdownRemaining -= 0.05;
+            updateCountdownUI(Math.max(0, countdownRemaining), countdownSecs);
+            if (countdownRemaining <= 0) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+                startPlayPhase();
+            }
+        }, 50);
+    } else {
+        // Visible mode: go straight to play phase without hiding
+        document.getElementById('countdown-ui').classList.add('hidden');
+        startPlayPhase();
+    }
+}
+
+function updateCountdownUI(remaining, total) {
+    document.getElementById('countdown-text').textContent = remaining.toFixed(1) + 's';
+    const pct = remaining / total;
+    document.getElementById('progress-bar').style.width = (pct * 100) + '%';
+    // Color shift: green → yellow → red
+    const r = Math.round(108 + (239 - 108) * (1 - pct));
+    const g = Math.round(99 + (68 - 99) * (1 - pct));
+    const b = Math.round(255 + (68 - 255) * (1 - pct));
+    document.getElementById('progress-bar').style.background =
+        `linear-gradient(90deg, rgb(${r},${g},${b}), rgba(${r},${g},${b},.6))`;
+}
+
+function startPlayPhase() {
+    phase = 'playing';
+
+    // Hide countdown, show timer
+    document.getElementById('countdown-ui').classList.add('hidden');
+    document.getElementById('timer-row').classList.remove('hidden');
+
+    // Update grid wrapper visual state
+    const wrapper = document.getElementById('grid-wrapper');
+    wrapper.className = 'playing';
+
+    if (hideMode) {
+        // Hide all numbers
+        getCells().forEach(cell => cell.classList.add('hide'));
+    }
+
+    // Start timer
+    timerStart = performance.now();
+    timerElapsed = 0;
+    timerInterval = setInterval(() => {
+        timerElapsed = performance.now() - timerStart;
+        document.getElementById('timer-display').textContent = (timerElapsed / 1000).toFixed(1) + 's';
+    }, 100);
+}
+
+function onCellClick() {
+    if (phase !== 'playing') return;
+
+    const index = parseInt(this.dataset.index);
+    if (clicked[index]) return;
+
+    clicked[index] = true;
+    ++clickCounter;
+
+    const v = parseInt(this.dataset.value);
+
+    // Reveal the number (in hide mode it was hidden; in visible mode it's already shown)
+    this.classList.remove('hide');
+
+    if (v !== clickCounter) {
+        // Failure — wrong number
+        this.classList.add('failure');
+        endGame(false, v, clickCounter);
+    } else {
+        this.classList.add('success');
+        if (clickCounter === N * N) {
+            // All numbers clicked in correct order → Win!
+            endGame(true);
+        }
+    }
+}
+
+function endGame(win, wrongVal, expected) {
+    phase = 'end';
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timerElapsed = performance.now() - timerStart;
+
+    const secs = timerElapsed / 1000;
+    const mode = hideMode ? 'hide' : 'show';
+
+    if (win) {
+        // Check record
+        const prev = getBestScore(mode, N);
+        let isRecord = false;
+        if (prev === null || secs < prev) {
+            setBestScore(mode, N, secs);
+            isRecord = true;
+        }
+
+        launchConfetti();
+        if (isRecord) {
+            showToast('record', '🏆', `新纪录！${secs.toFixed(2)}s — 恭喜！`, 5000);
+        } else {
+            showToast('win', '🎉', `完成！用时 ${secs.toFixed(2)}s（最佳 ${prev.toFixed(2)}s）`, 4000);
+        }
+        showOverlay('🎉', '挑战成功！', `用时 ${secs.toFixed(2)}s${isRecord ? ' 🏆 新纪录！' : ''}`, '#22c55e');
+        updateScorePills();
+        renderHistory();
+    } else {
+        showToast('fail', '❌', `点错了！应该是 ${expected}，你点了 ${wrongVal}`, 3500);
+        showOverlay('💥', '挑战失败', `应点 ${expected}，误点了 ${wrongVal}`, '#ef4444');
+        // Reveal all remaining numbers
+        revealAll();
+    }
+}
+
+function revealAll() {
+    // Reveal all cells that weren't clicked — show them dimmed
+    getCells().forEach((cell, i) => {
+        if (!clicked[i]) {
+            cell.classList.remove('hide');
+            cell.style.opacity = '0.55';
+        }
+    });
+}
+
+function resetToIdle() {
+    // Stop any intervals
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    if (timerInterval)     { clearInterval(timerInterval);     timerInterval = null; }
+
+    phase = 'idle';
+    clickCounter = 0;
+
+    // UI resets
+    document.getElementById('countdown-ui').classList.add('hidden');
+    document.getElementById('timer-row').classList.add('hidden');
+    document.getElementById('timer-display').textContent = '0.0s';
+    hideOverlay();
+    lockConfig(false);
+
+    // Reset grid wrapper
+    document.getElementById('grid-wrapper').className = '';
+
+    // Rebuild fresh grid
+    buildGrid();
+    updateScorePills();
+}
+
+/* ═══════════════════════════════════════════════════════
+   OVERLAY
+═══════════════════════════════════════════════════════ */
+function showOverlay(icon, text, sub, color) {
+    const ov = document.getElementById('msg-overlay');
+    document.getElementById('msg-overlay-icon').textContent = icon;
+    document.getElementById('msg-overlay-text').textContent = text;
+    document.getElementById('msg-overlay-text').style.color = color;
+    document.getElementById('msg-overlay-sub').textContent = sub;
+    ov.classList.add('show');
+}
+function hideOverlay() {
+    document.getElementById('msg-overlay').classList.remove('show');
+}
+
+/* ═══════════════════════════════════════════════════════
+   LOCK CONFIG DURING GAME
+═══════════════════════════════════════════════════════ */
+function lockConfig(locked) {
+    // Lock hide toggle, countdown config, and size adjustment buttons
+    const configSelectors = '#hide-toggle-wrap, #countdown-config';
+    document.querySelectorAll(configSelectors).forEach(el => {
+        el.style.opacity = locked ? '0.35' : '1';
+        el.style.pointerEvents = locked ? 'none' : '';
+    });
+    // Size adjust buttons specifically
+    document.querySelectorAll('button[onclick^="adjustSize"]').forEach(btn => {
+        btn.style.opacity = locked ? '0.35' : '1';
+        btn.style.pointerEvents = locked ? 'none' : '';
+        btn.disabled = locked;
+    });
+    // Size input
+    const sizeInput = document.getElementById('size-input');
+    sizeInput.style.opacity = locked ? '0.35' : '1';
+}
+
+/* ═══════════════════════════════════════════════════════
+   SCORE PILLS & HISTORY
+═══════════════════════════════════════════════════════ */
+function updateScorePills() {
+    const mode = hideMode ? 'hide' : 'show';
+    const best = getBestScore(mode, N);
+    document.getElementById('best-time-val').textContent = best !== null ? best.toFixed(2) + 's' : '—';
+    document.getElementById('pill-mode-label').textContent = hideMode ? '🙈 隐藏模式' : '👁 可见模式';
+    document.getElementById('pill-size-label').textContent = `${N}×${N}`;
+}
+
+function renderHistory() {
+    const scores = getAllScores();
+    const container = document.getElementById('history-table');
+    if (scores.length === 0) {
+        container.textContent = '暂无记录';
+        return;
+    }
+    // Build a small table
+    let html = `<table style="width:100%; border-collapse:collapse;">
+        <thead>
+            <tr style="border-bottom:1px solid var(--clr-border);">
+                <th style="text-align:left; padding:6px 8px; color:var(--clr-muted); font-weight:600;">模式</th>
+                <th style="text-align:center; padding:6px 8px; color:var(--clr-muted); font-weight:600;">矩阵</th>
+                <th style="text-align:right; padding:6px 8px; color:var(--clr-muted); font-weight:600;">最佳用时</th>
+            </tr>
+        </thead>
+        <tbody>`;
+    for (const s of scores) {
+        const modeLabel = s.mode === 'hide' ? '🙈 隐藏' : '👁 可见';
+        html += `<tr style="border-bottom:1px solid rgba(46,51,80,.5);">
+            <td style="padding:8px 8px; color:var(--clr-text);">${modeLabel}</td>
+            <td style="text-align:center; padding:8px 8px; color:var(--clr-accent2);">${s.size}×${s.size}</td>
+            <td style="text-align:right; padding:8px 8px; font-weight:700; color:var(--clr-text);">${s.time.toFixed(2)}s</td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+</script>
+</body>
 </html>
