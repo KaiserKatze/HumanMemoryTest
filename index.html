@@ -371,6 +371,40 @@
         @media (max-width: 360px) {
             :root { --cell-size: 44px; --cell-gap: 3px; }
         }
+
+        #timer-row {
+            /* 1. 强制设为固定的 inline-flex，并使其与左侧组件具有完全一致的行高线对齐 */
+            display: inline-flex !important;
+            align-items: center;
+            vertical-align: middle;
+
+            /* 2. 在默认隐藏（.hidden）时使用 opacity 代替 display: none，*/
+            /* 这能保证它在不显示时依然牢牢占据高度，彻底杜绝整行上下晃动 */
+            transition: opacity 0.15s ease;
+        }
+
+        /* 当没有进行游戏（隐藏状态）时，让它隐形且不响应鼠标，但保留占位高度 */
+        #timer-row.hidden {
+            display: inline-flex !important;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 3. 彻底解决数字左右晃动：启用硬件级等宽数字特性 */
+        #timer-display {
+            font-variant-numeric: tabular-nums;
+            font-family: 'Inter', monospace, system-ui; /* 回退策略确保等宽 */
+            display: inline-block;
+            min-width: 54px; /* 给时间数字预留固定宽度，防止位数变化时挤压别处的空间 */
+            text-align: right; /* 让数字向右对齐，更符合计时器习惯 */
+        }
+
+        /* 4. 彻底解决图标晃动：给图标和“用时”文本固定间距 */
+        #timer-row > span:first-of-type {
+            margin-left: 4px;
+            margin-right: 2px;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body class="noselect">
@@ -392,7 +426,7 @@
                    line-height:1.1; margin-bottom:8px;">
             Memory
         </h1>
-        <p style="color:var(--clr-muted); font-size:.9rem; letter-spacing:.08em; text-transform:uppercase;">记忆挑战 v1.0.1</p>
+        <p style="color:var(--clr-muted); font-size:.9rem; letter-spacing:.08em; text-transform:uppercase;">记忆挑战 v1.0.2</p>
     </div>
 
     <!-- Main Card -->
@@ -434,12 +468,19 @@
         </div>
 
         <!-- Scores Row -->
-        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px;" id="scores-row">
-            <div class="score-pill" id="pill-mode">
-                <span id="pill-mode-label">👁 可见模式</span>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:between; width:100%; margin-bottom:24px;" id="scores-row">
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                <div class="score-pill" id="pill-mode">
+                    <span id="pill-mode-label">👁 可见模式</span>
+                </div>
+                <div class="score-pill">
+                    🎯 <span id="pill-size-label">5×5</span>
+                </div>
             </div>
-            <div class="score-pill">
-                🎯 <span id="pill-size-label">5×5</span>
+
+            <div id="timer-row" class="score-pill hidden" style="margin-left: auto;">
+                ⏱️ <span>用时</span>
+                <strong id="timer-display">0.00s</strong>
             </div>
         </div>
 
@@ -462,12 +503,6 @@
                     <span id="msg-overlay-sub" style="font-size:.9rem; color:var(--clr-muted);"></span>
                 </div>
             </div>
-        </div>
-
-        <!-- Timer row (shown during play phase) -->
-        <div id="timer-row" class="hidden" style="text-align:center; margin-bottom:16px;">
-            <span style="color:var(--clr-muted); font-size:.85rem;">用时</span>
-            <span id="timer-display" style="font-size:1.4rem; font-weight:700; color:var(--clr-accent2); margin-left:8px;">0.0s</span>
         </div>
 
         <!-- Action Button -->
@@ -925,7 +960,7 @@ function resetToIdle() {
     // UI resets
     document.getElementById('countdown-ui').classList.add('hidden');
     document.getElementById('timer-row').classList.add('hidden');
-    document.getElementById('timer-display').textContent = '0.0s';
+    document.getElementById('timer-display').textContent = '0.00s';
     hideOverlay();
     lockConfig(false);
 
