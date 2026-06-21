@@ -426,7 +426,7 @@
                    line-height:1.1; margin-bottom:8px;">
             Memory
         </h1>
-        <p style="color:var(--clr-muted); font-size:.9rem; letter-spacing:.08em; text-transform:uppercase;">记忆挑战 v1.0.2</p>
+        <p style="color:var(--clr-muted); font-size:.9rem; letter-spacing:.08em; text-transform:uppercase;">记忆挑战 v1.0.3</p>
     </div>
 
     <!-- Main Card -->
@@ -459,10 +459,10 @@
         <!-- Countdown Config -->
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;" id="countdown-config">
             <span style="color:var(--clr-muted); font-size:.85rem; font-weight:500;">记忆时间</span>
-            <div style="display:flex; align-items:center; gap:8px;">
-                <button onclick="adjustCountdown(-1)" class="btn-secondary" style="padding:6px 12px; font-size:1rem;">−</button>
+            <div style="display:flex; align-items:center; gap:8px;" class="select-none">
+                <button id="countdown-dec" class="btn-secondary" style="padding:6px 12px; font-size:1rem; -webkit-user-select:none; user-select:none;">−</button>
                 <input type="number" id="countdown-input" class="input-num" value="5" min="1" max="60" readonly>
-                <button onclick="adjustCountdown(1)"  class="btn-secondary" style="padding:6px 12px; font-size:1rem;">+</button>
+                <button id="countdown-inc" class="btn-secondary" style="padding:6px 12px; font-size:1rem; -webkit-user-select:none; user-select:none;">+</button>
             </div>
             <span style="color:var(--clr-muted); font-size:.85rem;">秒</span>
         </div>
@@ -973,6 +973,88 @@ function resetToIdle() {
 }
 
 /* ═══════════════════════════════════════════════════════
+   MEMORY COUNTDOWN LONG PRESS ACCELERATION
+═══════════════════════════════════════════════════════ */
+let countdownPressTimer = null; // 用于管理连续触发的定时器
+let countdownHoldTimeout = null; // 用于延迟进入长按状态的定时器
+
+/**
+ * 核心逻辑：执行单次数值加减，并自动根据长按时长计算并启动下一次的触发
+ * @param {number} delta - 改变的步长（+1 或 -1）
+ * @param {number} startTime - 开始按下时的时间戳 (performance.now())
+ */
+function scheduleNextCountdownAdjust(delta, startTime) {
+    if (phase === 'memorize' || phase === 'playing') return;
+
+    // 1. 执行当前的数字更新
+    countdownSecs = Math.min(60, Math.max(1, countdownSecs + delta));
+    document.getElementById('countdown-input').value = countdownSecs;
+
+    // 2. 计算长按已经持续了多少毫秒
+    const elapsed = performance.now() - startTime;
+
+    // 3. 动态计算下一次触发的动态间隔时间（实现指数级的平滑加速度）
+    // 起步间隔 200ms，随着长按时间推移，最短缩短至 30ms（即 1 秒能跳 33 个数）
+    let nextDelay = Math.max(30, 200 - (elapsed / 10)); 
+
+    // 4. 递归排期下一次变更
+    countdownPressTimer = setTimeout(() => {
+        scheduleNextCountdownAdjust(delta, startTime);
+    }, nextDelay);
+}
+
+/**
+ * 初始化并绑定长按加减事件
+ */
+function initCountdownLongPress() {
+    const decBtn = document.getElementById('countdown-dec');
+    const incBtn = document.getElementById('countdown-inc');
+    
+    if (!decBtn || !incBtn) return;
+
+    // 核心按下事件处理函数
+    function startPress(e, delta) {
+        if (phase === 'memorize' || phase === 'playing') return;
+        e.preventDefault(); // 阻止移动端默认的缩放或放大镜行为
+
+        const startTime = performance.now();
+        
+        // 先触发单次点击
+        countdownSecs = Math.min(60, Math.max(1, countdownSecs + delta));
+        document.getElementById('countdown-input').value = countdownSecs;
+
+        // 若按下超过 350ms，则断定为“长按状态”，开始开火执行加速度计逻辑
+        countdownHoldTimeout = setTimeout(() => {
+            scheduleNextCountdownAdjust(delta, startTime);
+        }, 350);
+    }
+
+    // 核心释放事件处理函数
+    function endPress() {
+        if (countdownHoldTimeout) { clearTimeout(countdownHoldTimeout); countdownHoldTimeout = null; }
+        if (countdownPressTimer)   { clearTimeout(countdownPressTimer);   countdownPressTimer = null; }
+    }
+
+    // 为 减号 按钮绑定鼠标与触屏事件
+    decBtn.addEventListener('mousedown', (e) => startPress(e, -1));
+    decBtn.addEventListener('touchstart', (e) => startPress(e, -1), { passive: false });
+
+    // 为 加号 按钮绑定鼠标与触屏事件
+    incBtn.addEventListener('mousedown', (e) => startPress(e, 1));
+    incBtn.addEventListener('touchstart', (e) => startPress(e, 1), { passive: false });
+
+    // 全局释放拦截：防止用户把手指/鼠标拖出按钮外松开导致定时器无限轰炸
+    window.addEventListener('mouseup', endPress);
+    window.addEventListener('touchend', endPress);
+    window.addEventListener('touchcancel', endPress);
+}
+
+// 确保在 DOM 加载完成后运行初始化
+window.addEventListener('DOMContentLoaded', () => {
+    initCountdownLongPress();
+});
+
+/* ═══════════════════════════════════════════════════════
    OVERLAY
 ═══════════════════════════════════════════════════════ */
 function showOverlay(icon, text, sub, color) {
@@ -1006,6 +1088,15 @@ function lockConfig(locked) {
     // Size input
     const sizeInput = document.getElementById('size-input');
     sizeInput.style.opacity = locked ? '0.35' : '1';
+
+    const decBtn = document.getElementById('countdown-dec');
+    const incBtn = document.getElementById('countdown-inc');
+    if (decBtn && incBtn) {
+        decBtn.style.opacity = locked ? '0.35' : '1';
+        decBtn.style.pointerEvents = locked ? 'none' : '';
+        incBtn.style.opacity = locked ? '0.35' : '1';
+        incBtn.style.pointerEvents = locked ? 'none' : '';
+    }
 }
 
 /* ═══════════════════════════════════════════════════════
