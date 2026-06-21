@@ -392,7 +392,7 @@
                    line-height:1.1; margin-bottom:8px;">
             Memory
         </h1>
-        <p style="color:var(--clr-muted); font-size:.9rem; letter-spacing:.08em; text-transform:uppercase;">记忆挑战</p>
+        <p style="color:var(--clr-muted); font-size:.9rem; letter-spacing:.08em; text-transform:uppercase;">记忆挑战 v1.0.1</p>
     </div>
 
     <!-- Main Card -->
@@ -427,7 +427,7 @@
             <span style="color:var(--clr-muted); font-size:.85rem; font-weight:500;">记忆时间</span>
             <div style="display:flex; align-items:center; gap:8px;">
                 <button onclick="adjustCountdown(-1)" class="btn-secondary" style="padding:6px 12px; font-size:1rem;">−</button>
-                <input type="number" id="countdown-input" class="input-num" value="5" min="1" max="30" readonly style="width:52px;">
+                <input type="number" id="countdown-input" class="input-num" value="5" min="1" max="60" readonly>
                 <button onclick="adjustCountdown(1)"  class="btn-secondary" style="padding:6px 12px; font-size:1rem;">+</button>
             </div>
             <span style="color:var(--clr-muted); font-size:.85rem;">秒</span>
@@ -435,9 +435,6 @@
 
         <!-- Scores Row -->
         <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px;" id="scores-row">
-            <div class="score-pill" id="pill-best">
-                🏆 最佳用时 <strong id="best-time-val">—</strong>
-            </div>
             <div class="score-pill" id="pill-mode">
                 <span id="pill-mode-label">👁 可见模式</span>
             </div>
@@ -477,7 +474,7 @@
         <div style="display:flex; justify-content:center; gap:12px;">
             <button id="main-btn" class="btn-primary" onclick="handleMainButton()">
                 <span id="main-btn-icon">▶</span>
-                <span id="main-btn-text">开始游戏</span>
+                <span id="main-btn-text">开始</span>
             </button>
         </div>
     </div>
@@ -491,7 +488,7 @@
             <div class="step">
                 <div class="step-num">1</div>
                 <div style="color:var(--clr-muted); font-size:.9rem; line-height:1.6;">
-                    设置矩阵大小（N×N），选择是否隐藏数字，设定记忆时间后点击 <strong style="color:var(--clr-text);">开始游戏</strong>。
+                    设置矩阵大小（N×N），选择是否隐藏数字，设定记忆时间后点击 <strong style="color:var(--clr-text);">开始</strong>。
                 </div>
             </div>
             <div class="step">
@@ -637,7 +634,6 @@ let hideMode = true;        // true = hide numbers after countdown
 
 // Phase: 'idle' | 'memorize' | 'playing' | 'end'
 let phase = 'idle';
-let everStarted = false;    // once true, button shows "重置"
 
 let arr = [];               // shuffled numbers 1..N²
 let clicked = [];           // bool array N²
@@ -663,7 +659,8 @@ window.addEventListener('DOMContentLoaded', () => {
    CONFIG CONTROLS
 ═══════════════════════════════════════════════════════ */
 function adjustSize(delta) {
-    if (phase !== 'idle') return;
+    if (phase === 'memorize' || phase === 'playing') return;
+    if (phase === 'end') stopGame();
     N = Math.min(10, Math.max(2, N + delta));
     document.getElementById('size-input').value = N;
     document.getElementById('size-label').textContent = `${N} × ${N}`;
@@ -673,13 +670,13 @@ function adjustSize(delta) {
 }
 
 function adjustCountdown(delta) {
-    if (phase !== 'idle') return;
-    countdownSecs = Math.min(30, Math.max(1, countdownSecs + delta));
+    if (phase === 'memorize' || phase === 'playing') return;
+    countdownSecs = Math.min(60, Math.max(1, countdownSecs + delta));
     document.getElementById('countdown-input').value = countdownSecs;
 }
 
 function toggleHide() {
-    if (phase !== 'idle') return;
+    if (phase === 'memorize' || phase === 'playing') return;
     hideMode = !hideMode;
     const track = document.getElementById('hide-toggle');
     const label = document.getElementById('hide-label');
@@ -730,25 +727,25 @@ function getCells() {
    MAIN BUTTON
 ═══════════════════════════════════════════════════════ */
 function handleMainButton() {
-    if (!everStarted) {
-        // Very first click → start
-        everStarted = true;
-        setButtonReset();
+    if (phase === 'idle') {
+        setButtonStop();
         startMemorizePhase();
     } else {
-        // Any subsequent click → reset
-        resetToIdle();
-        startMemorizePhase();
+        stopGame();
     }
 }
 
 function setButtonStart() {
     document.getElementById('main-btn-icon').textContent = '▶';
-    document.getElementById('main-btn-text').textContent = '开始游戏';
+    document.getElementById('main-btn-text').textContent = '开始';
 }
-function setButtonReset() {
-    document.getElementById('main-btn-icon').textContent = '↺';
-    document.getElementById('main-btn-text').textContent = '重置';
+function setButtonStop() {
+    document.getElementById('main-btn-icon').textContent = '⏹';
+    document.getElementById('main-btn-text').textContent = '停止';
+}
+function stopGame() {
+    resetToIdle();
+    setButtonStart();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -836,7 +833,7 @@ function startPlayPhase() {
     timerElapsed = 0;
     timerInterval = setInterval(() => {
         timerElapsed = performance.now() - timerStart;
-        document.getElementById('timer-display').textContent = (timerElapsed / 1000).toFixed(1) + 's';
+        document.getElementById('timer-display').textContent = (timerElapsed / 1000).toFixed(2) + 's';
     }, 100);
 }
 
@@ -876,6 +873,8 @@ function endGame(win, wrongVal, expected) {
     const secs = timerElapsed / 1000;
     const mode = hideMode ? 'hide' : 'show';
 
+    document.getElementById('timer-display').textContent = secs.toFixed(2) + 's';
+
     if (win) {
         // Check record
         const prev = getBestScore(mode, N);
@@ -900,6 +899,9 @@ function endGame(win, wrongVal, expected) {
         // Reveal all remaining numbers
         revealAll();
     }
+
+    lockConfig(false);
+    setButtonStart();
 }
 
 function revealAll() {
@@ -977,7 +979,6 @@ function lockConfig(locked) {
 function updateScorePills() {
     const mode = hideMode ? 'hide' : 'show';
     const best = getBestScore(mode, N);
-    document.getElementById('best-time-val').textContent = best !== null ? best.toFixed(2) + 's' : '—';
     document.getElementById('pill-mode-label').textContent = hideMode ? '🙈 隐藏模式' : '👁 可见模式';
     document.getElementById('pill-size-label').textContent = `${N}×${N}`;
 }
